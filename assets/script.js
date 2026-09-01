@@ -24,31 +24,70 @@ function tagsHTML(tags) {
   return (tags || []).map(t => `<span class="tag">${escapeHTML(t)}</span>`).join('');
 }
 
-function postCardHTML(post) {
-  return `
-    <a class="post-card" href="post.html?slug=${encodeURIComponent(post.file)}">
-      <div class="tags">${tagsHTML(post.tags)}</div>
-      <h3>${escapeHTML(post.title)}</h3>
-      <p class="excerpt">${escapeHTML(post.preview || '')}</p>
-      <div class="meta"><span>${formatDate(post.date)}</span><span>${post.chars ? post.chars + '자' : ''}</span></div>
-    </a>`;
+// ---- "다른 곳에 옮겨 씀" 체크 상태 (이 브라우저에만 저장됨) ----
+const MOVED_KEY = 'korea-ai-blog:moved';
+
+function loadMoved() {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(MOVED_KEY) || '[]'));
+  } catch (e) {
+    return new Set();
+  }
 }
 
-function renderGrid(container, posts) {
+function saveMoved(set) {
+  try {
+    localStorage.setItem(MOVED_KEY, JSON.stringify([...set]));
+  } catch (e) { /* 저장 불가 환경(시크릿 모드 등) — 조용히 무시 */ }
+}
+
+function postCardHTML(post, moved) {
+  const isMoved = moved && moved.has(post.file);
+  return `
+    <div class="post-card${isMoved ? ' is-moved' : ''}" data-slug="${escapeHTML(post.file)}">
+      <label class="move-check" title="다른 곳에 옮겨 작성함">
+        <input type="checkbox" data-slug="${escapeHTML(post.file)}" ${isMoved ? 'checked' : ''} aria-label="다른 곳에 옮겨 작성함">
+        <span class="box"></span>
+      </label>
+      <a class="card-link" href="post.html?slug=${encodeURIComponent(post.file)}">
+        <div class="tags">${tagsHTML(post.tags)}</div>
+        <h3>${escapeHTML(post.title)}</h3>
+        <p class="excerpt">${escapeHTML(post.preview || '')}</p>
+        <div class="meta"><span>${formatDate(post.date)}</span><span>${post.chars ? post.chars + '자' : ''}</span></div>
+      </a>
+    </div>`;
+}
+
+function renderGrid(container, posts, moved) {
   if (!posts.length) {
     container.innerHTML = '<p class="empty-note">아직 발행된 글이 없습니다.</p>';
     return;
   }
-  container.innerHTML = posts.map(postCardHTML).join('');
+  container.innerHTML = posts.map(p => postCardHTML(p, moved)).join('');
+}
+
+// 그리드 컨테이너 하나에 체크박스 토글을 위임 연결
+function wireMoveChecks(container, moved, onChange) {
+  container.addEventListener('change', e => {
+    const input = e.target.closest('input[type="checkbox"][data-slug]');
+    if (!input) return;
+    const slug = input.dataset.slug;
+    if (input.checked) moved.add(slug); else moved.delete(slug);
+    saveMoved(moved);
+    input.closest('.post-card').classList.toggle('is-moved', input.checked);
+    if (onChange) onChange();
+  });
 }
 
 // ---- home ----
 async function initHome() {
   const grid = document.getElementById('latest-grid');
   if (!grid) return;
+  const moved = loadMoved();
   try {
     const posts = await fetchPosts();
-    renderGrid(grid, posts.slice(0, 6));
+    renderGrid(grid, posts.slice(0, 6), moved);
+    wireMoveChecks(grid, moved);
   } catch (e) {
     grid.innerHTML = '<p class="empty-note">글 목록을 불러오지 못했습니다.</p>';
     console.error(e);
@@ -62,19 +101,24 @@ async function initArchive() {
   const filterBar = document.getElementById('tag-filters');
   const searchInput = document.getElementById('search-input');
   const countEl = document.getElementById('result-count');
+  const moveFilter = document.getElementById('move-filter');
+  const moved = loadMoved();
 
   let posts = [];
   let activeTag = null;
 
   function applyFilters() {
     const q = (searchInput.value || '').trim().toLowerCase();
+    const moveMode = moveFilter.value; // 'all' | 'pending' | 'moved'
     const filtered = posts.filter(p => {
       const tagOk = !activeTag || (p.tags || []).includes(activeTag);
       const qOk = !q || p.title.toLowerCase().includes(q) || (p.preview || '').toLowerCase().includes(q);
-      return tagOk && qOk;
+      const isMoved = moved.has(p.file);
+      const moveOk = moveMode === 'all' || (moveMode === 'moved' ? isMoved : !isMoved);
+      return tagOk && qOk && moveOk;
     });
-    renderGrid(grid, filtered);
-    countEl.textContent = `${filtered.length}건`;
+    renderGrid(grid, filtered, moved);
+    countEl.textContent = `${filtered.length}건 (옮김 ${moved.size}/${posts.length})`;
   }
 
   try {
@@ -98,6 +142,8 @@ async function initArchive() {
     applyFilters();
   });
   searchInput.addEventListener('input', applyFilters);
+  moveFilter.addEventListener('change', applyFilters);
+  wireMoveChecks(grid, moved, applyFilters);
 
   applyFilters();
 }
@@ -146,7 +192,9 @@ async function initPost() {
       .slice(0, 3);
     const relatedSection = document.getElementById('related');
     if (related.length) {
-      relatedSection.innerHTML = '<h2>관련 글</h2><div class="card-grid">' + related.map(postCardHTML).join('') + '</div>';
+      const moved = loadMoved();
+      relatedSection.innerHTML = '<h2>관련 글</h2><div class="card-grid">' + related.map(p => postCardHTML(p, moved)).join('') + '</div>';
+      wireMoveChecks(relatedSection, moved);
     }
   } catch (e) {
     root.innerHTML = '<p class="empty-note">글을 불러오지 못했습니다.</p>';

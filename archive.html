@@ -27,7 +27,13 @@
   <div class="filter-bar">
     <div id="tag-filters"></div>
     <input class="search-input" id="search-input" type="search" placeholder="제목·내용 검색">
+    <select class="move-select" id="move-filter">
+      <option value="all">전체 글</option>
+      <option value="pending">아직 안 옮긴 글만</option>
+      <option value="moved">옮긴 글만</option>
+    </select>
   </div>
+  <p class="move-hint">체크박스는 다른 곳에 옮겨 쓴 글을 표시하는 용도예요. 이 브라우저에만 저장됩니다.</p>
   <p class="result-count" id="result-count"></p>
 
   <div class="card-grid" id="archive-grid">
