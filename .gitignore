@@ -6,6 +6,5 @@ desktop.ini
 # Claude Code 내부 파일 (로컬 전용)
 .claude/
 
-# 블로그 자동화 작업 중간 파일
+# 블로그 자동화 작업 중간 파일 (톤·SEO 규칙은 클라우드 라우틴이 읽어야 해서 커밋함)
 drafts/
-context/
