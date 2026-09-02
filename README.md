@@ -5,3 +5,5 @@
 - 사이트: https://chan63078-dot.github.io/korea-ai-blog/
 - 발행 파이프라인: 리서치 → 팩트체크 → 구조설계 → 초안 → 검수 → 발행 (Claude Code 서브에이전트, `.claude/agents/`)
 - 새 글은 `blog-posts/{slug}.md` + `blog-posts/index.json`으로 관리됩니다.
+
+<!-- push-test 2026-09-02 -->
