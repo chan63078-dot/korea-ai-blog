@@ -45,10 +45,13 @@ function postCardHTML(post, moved) {
   const isMoved = moved && moved.has(post.file);
   return `
     <div class="post-card${isMoved ? ' is-moved' : ''}" data-slug="${escapeHTML(post.file)}">
-      <label class="move-check" title="다른 곳에 옮겨 작성함">
-        <input type="checkbox" data-slug="${escapeHTML(post.file)}" ${isMoved ? 'checked' : ''} aria-label="다른 곳에 옮겨 작성함">
-        <span class="box"></span>
-      </label>
+      <div class="card-actions">
+        <button type="button" class="copy-btn" data-slug="${escapeHTML(post.file)}" title="다른 블로그에 붙여넣을 텍스트 복사">복사</button>
+        <label class="move-check" title="다른 곳에 옮겨 작성함">
+          <input type="checkbox" data-slug="${escapeHTML(post.file)}" ${isMoved ? 'checked' : ''} aria-label="다른 곳에 옮겨 작성함">
+          <span class="box"></span>
+        </label>
+      </div>
       <a class="card-link" href="post.html?slug=${encodeURIComponent(post.file)}">
         <div class="tags">${tagsHTML(post.tags)}</div>
         <h3>${escapeHTML(post.title)}</h3>
@@ -56,6 +59,76 @@ function postCardHTML(post, moved) {
         <div class="meta"><span>${formatDate(post.date)}</span><span>${post.chars ? post.chars + '자' : ''}</span></div>
       </a>
     </div>`;
+}
+
+// ---- 마크다운 → 다른 블로그(네이버 등)에 붙여넣기 좋은 평문 변환 ----
+function markdownToPlainText(md) {
+  return md
+    .replace(/^#{1,6}\s*/gm, '')          // ## 제목 -> 제목
+    .replace(/\*\*(.+?)\*\*/g, '$1')      // **굵게** -> 굵게
+    .replace(/(?<!\*)\*(?!\*)(.+?)\*(?!\*)/g, '$1') // *기울임* -> 기울임
+    .replace(/^>\s?/gm, '')               // > 인용 -> 인용
+    .replace(/^-{3,}$/gm, '')             // 구분선 제거
+    .replace(/\n{3,}/g, '\n\n')           // 빈 줄 3개 이상 -> 2개
+    .trim();
+}
+
+async function copyPostBySlug(slug, posts) {
+  const post = posts.find(p => p.file === slug);
+  if (!post) return false;
+  const res = await fetch('blog-posts/' + post.file);
+  const raw = await res.text();
+  const body = markdownToPlainText(stripFrontmatter(raw));
+  const text = `${post.title}\n\n${body}`;
+  await copyToClipboard(text);
+  return true;
+}
+
+async function copyToClipboard(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (e) {
+    // 클립보드 API 불가 환경 대비 fallback
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      return true;
+    } catch (e2) {
+      return false;
+    }
+  }
+}
+
+function flashButton(btn, label) {
+  const original = btn.textContent;
+  btn.textContent = label;
+  btn.classList.add('copied');
+  setTimeout(() => {
+    btn.textContent = original;
+    btn.classList.remove('copied');
+  }, 1400);
+}
+
+// 그리드 컨테이너 하나에 복사 버튼 위임 연결
+function wireCopyButtons(container, postsPromiseOrArray) {
+  container.addEventListener('click', async e => {
+    const btn = e.target.closest('.copy-btn');
+    if (!btn) return;
+    e.preventDefault();
+    const slug = btn.dataset.slug;
+    const posts = typeof postsPromiseOrArray.then === 'function' ? await postsPromiseOrArray : postsPromiseOrArray;
+    btn.disabled = true;
+    const ok = await copyPostBySlug(slug, posts).catch(() => false);
+    btn.disabled = false;
+    flashButton(btn, ok ? '복사됨' : '실패');
+  });
 }
 
 function renderGrid(container, posts, moved) {
@@ -88,6 +161,7 @@ async function initHome() {
     const posts = await fetchPosts();
     renderGrid(grid, posts.slice(0, 6), moved);
     wireMoveChecks(grid, moved);
+    wireCopyButtons(grid, posts);
   } catch (e) {
     grid.innerHTML = '<p class="empty-note">글 목록을 불러오지 못했습니다.</p>';
     console.error(e);
@@ -144,6 +218,7 @@ async function initArchive() {
   searchInput.addEventListener('input', applyFilters);
   moveFilter.addEventListener('change', applyFilters);
   wireMoveChecks(grid, moved, applyFilters);
+  wireCopyButtons(grid, posts);
 
   applyFilters();
 }
@@ -184,8 +259,20 @@ async function initPost() {
     document.getElementById('post-head').innerHTML = `
       <div class="tags">${tagsHTML(post.tags)}</div>
       <h1>${escapeHTML(post.title)}</h1>
-      <div class="meta">${formatDate(post.date)} · ${post.chars ? post.chars + '자' : ''}</div>`;
+      <div class="meta-row">
+        <div class="meta">${formatDate(post.date)} · ${post.chars ? post.chars + '자' : ''}</div>
+        <button type="button" class="copy-btn copy-btn-lg" id="copy-post-btn">다른 블로그용으로 복사</button>
+      </div>`;
     document.getElementById('post-body').innerHTML = bodyHTML;
+
+    const plainText = `${post.title}\n\n${markdownToPlainText(body)}`;
+    document.getElementById('copy-post-btn').addEventListener('click', async () => {
+      const btn = document.getElementById('copy-post-btn');
+      btn.disabled = true;
+      const ok = await copyToClipboard(plainText);
+      btn.disabled = false;
+      flashButton(btn, ok ? '복사됨 — 붙여넣기 하세요' : '복사 실패');
+    });
 
     const related = posts
       .filter(p => p.file !== post.file && (p.tags || []).some(t => (post.tags || []).includes(t)))
@@ -195,6 +282,7 @@ async function initPost() {
       const moved = loadMoved();
       relatedSection.innerHTML = '<h2>관련 글</h2><div class="card-grid">' + related.map(p => postCardHTML(p, moved)).join('') + '</div>';
       wireMoveChecks(relatedSection, moved);
+      wireCopyButtons(relatedSection, posts);
     }
   } catch (e) {
     root.innerHTML = '<p class="empty-note">글을 불러오지 못했습니다.</p>';
