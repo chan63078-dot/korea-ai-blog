@@ -15,7 +15,7 @@ korea-ai-blog/
 ├── blog-posts/
 │   ├── index.json        ← 발행된 글 목록 (사이트가 이 파일을 읽음)
 │   └── {slug}_{YYYYMMDD}.md
-├── context/               ← 톤·가독성·SEO·금지표현
+├── context/               ← 톤·가독성·SEO·금지표현·자사홍보
 ├── drafts/                ← 작업 중간 파일 (git 제외)
 └── .claude/
     ├── agents/            ← 6개 서브에이전트
@@ -23,12 +23,14 @@ korea-ai-blog/
 ```
 
 ## 핵심 규칙 (항상 적용)
-1. `context/` 폴더의 4개 파일(tone·forbidden·readability·seo)을 **항상** 먼저 읽고 시작한다
+1. `context/` 폴더의 5개 파일(tone·forbidden·readability·seo·promotion)을 **항상** 먼저 읽고 시작한다
 2. 오늘 날짜 기준 최신 정보만 사용한다
 3. 팩트체커가 REJECTED 처리한 내용은 글에 포함하지 않는다
 4. 새 키워드를 고를 때 `blog-posts/index.json`과 `Desktop\블로그 작성기` 폴더의 기존 주제·포맷을 확인해 겹치지 않게 한다. 포맷은 튜토리얼형·지역밀착형·이슈해설형·학습법비교형·직군소개형 5가지를 순환시킨다. 아래 "주제 선정 가이드"의 예시 주제 풀을 참고해 매번 다른 각도를 고른다
 5. 최종본은 `blog-posts/{slug}.md` 저장 + `index.json` 갱신 + `git push`까지 마쳐야 발행 완료로 본다. 동시에 `C:\Users\IT-대구\Desktop\블로그 작성기` 폴더에 `{YYYY-MM-DD}_{제목}.txt`로 이중 백업한다
 6. 이 블로그 작업 파이프라인은 사용자가 전권을 위임했으므로, 각 단계·최종 발행 전 사용자 확인을 받지 않고 끝까지 자동으로 진행한다
+7. **경쟁사(인프런·패스트캠퍼스·코드잇 등 AI·IT 강의/학원/부트캠프 업체) 언급·비교·추천 금지.** "OOO vs OOO 강의 비교" 같은 경쟁사 중심 주제 자체를 기획하지 않는다 — `context/forbidden.md`의 경쟁사 언급 금지 섹션 참고
+8. 학습법·비교형/직군소개형/지역밀착형처럼 문맥이 맞는 글에는 `context/promotion.md` 가이드에 따라 코리아AI아카데미대구를 자연스럽게 1회 녹여낸다. 억지로 넣지 않고, 과장된 홍보 문구는 쓰지 않는다
 
 ## 주제 선정 가이드
 
