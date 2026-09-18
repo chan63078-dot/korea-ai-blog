@@ -251,6 +251,40 @@ async function initPost() {
 
     document.title = `${post.title} — 코리아AI아카데미 블로그`;
 
+    // ---- SEO: per-post meta description / OG tags / JSON-LD ----
+    const postUrl = location.origin + location.pathname + '?slug=' + encodeURIComponent(post.file);
+    const descText = (post.preview || post.title).slice(0, 150);
+
+    function setMeta(selector, attr, value) {
+      let el = document.querySelector(selector);
+      if (!el) {
+        el = document.createElement('meta');
+        const [, key, val] = selector.match(/\[(\w+)="([^"]+)"\]/);
+        el.setAttribute(key, val);
+        document.head.appendChild(el);
+      }
+      el.setAttribute(attr, value);
+    }
+
+    setMeta('meta[name="description"]', 'content', descText);
+    setMeta('meta[property="og:title"]', 'content', post.title);
+    setMeta('meta[property="og:description"]', 'content', descText);
+    setMeta('meta[property="og:type"]', 'content', 'article');
+    setMeta('meta[property="og:url"]', 'content', postUrl);
+
+    const ld = document.createElement('script');
+    ld.type = 'application/ld+json';
+    ld.textContent = JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      "headline": post.title,
+      "datePublished": post.date,
+      "url": postUrl,
+      "description": descText,
+      "author": { "@type": "Organization", "name": "코리아AI아카데미대구" }
+    });
+    document.head.appendChild(ld);
+
     const mdRes = await fetch('blog-posts/' + post.file);
     const raw = await mdRes.text();
     const body = stripFrontmatter(raw);
